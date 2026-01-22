@@ -117,6 +117,11 @@ class ReservedSeat(models.Model):
         related_name="reserved_seats",
         on_delete=models.CASCADE,
     )
+    screening = models.ForeignKey(
+        Screening,
+        related_name="reserved_seats",
+        on_delete=models.CASCADE,
+    )
     seat = models.ForeignKey(
         Seat,
         related_name="reservations",
@@ -124,7 +129,12 @@ class ReservedSeat(models.Model):
     )
 
     class Meta:
-        unique_together = ("reservation", "seat")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["screening", "seat"],
+                name="unique_seat_per_screening",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.seat} ({self.reservation})"

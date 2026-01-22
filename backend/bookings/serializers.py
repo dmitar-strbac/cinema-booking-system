@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction, IntegrityError
 from .models import (
     Movie,
     Hall,
@@ -69,12 +70,6 @@ class ReservedSeatSerializer(serializers.ModelSerializer):
 
 class ReservationSerializer(serializers.ModelSerializer):
     reserved_seats = ReservedSeatSerializer(many=True, read_only=True)
-    seat_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Seat.objects.all(),
-        many=True,
-        write_only=True,
-        source="reservedseat_set",
-    )
 
     class Meta:
         model = Reservation
@@ -87,5 +82,58 @@ class ReservationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "reserved_seats",
-            "seat_ids",
         ]
+
+
+class ReservationCreateSerializer(serializers.ModelSerializer):
+    seat_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Seat.objects.all(),
+        many=True,
+        write_only=True
+    )
+
+    class Meta:
+        model = Reservation
+        fields = [
+            "id",
+            "screening",
+            "customer_name",
+            "customer_email",
+            "seat_ids",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["id", "status", "created_at"]
+
+    def validate(self, attrs):
+        screening = attrs["screening"]
+        seats = attrs["seat_ids"]
+
+        hall_seat_ids = set(
+            Seat.objects.filter(hall=screening.hall).values_list("id", flat=True)
+        )
+        for s in seats:
+            if s.id not in hall_seat_ids:
+                raise serializers.ValidationError("One or more seats do not belong to the screening hall.")
+        return attrs
+
+    def create(self, validated_data):
+        seats = validated_data.pop("seat_ids")
+        screening = validated_data["screening"]
+
+        with transaction.atomic():
+            reservation = Reservation.objects.create(**validated_data)
+
+            try:
+                ReservedSeat.objects.bulk_create([
+                    ReservedSeat(
+                        reservation=reservation,
+                        screening=screening,
+                        seat=seat
+                    )
+                    for seat in seats
+                ])
+            except IntegrityError:
+                raise serializers.ValidationError("One or more selected seats are already reserved.")
+
+        return reservation
