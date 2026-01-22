@@ -1,5 +1,5 @@
 from django.db import models
-
+from django.utils import timezone
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -138,3 +138,18 @@ class ReservedSeat(models.Model):
 
     def __str__(self) -> str:
         return f"{self.seat} ({self.reservation})"
+    
+
+class SeatHold(TimeStampedModel):
+    screening = models.ForeignKey(Screening, related_name="seat_holds", on_delete=models.CASCADE)
+    seat = models.ForeignKey(Seat, related_name="holds", on_delete=models.PROTECT)
+    held_by = models.CharField(max_length=64)  
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["screening", "seat"], name="unique_hold_per_seat_screening"),
+        ]
+
+    def is_active(self) -> bool:
+        return self.expires_at > timezone.now()

@@ -7,7 +7,9 @@ from .models import (
     Screening,
     Reservation,
     ReservedSeat,
+    SeatHold,
 )
+from django.utils import timezone
 
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -91,6 +93,11 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         many=True,
         write_only=True
     )
+    client_id = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
 
     class Meta:
         model = Reservation
@@ -100,6 +107,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             "customer_name",
             "customer_email",
             "seat_ids",
+            "client_id",
             "status",
             "created_at",
         ]
@@ -120,8 +128,27 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         seats = validated_data.pop("seat_ids")
         screening = validated_data["screening"]
+        client_id = (validated_data.pop("client_id", "") or "").strip()
 
         with transaction.atomic():
+            SeatHold.objects.filter(
+                screening=screening,
+                expires_at__lte=timezone.now()
+            ).delete()
+
+            if client_id:
+                active_holds = SeatHold.objects.filter(
+                    screening=screening,
+                    seat__in=seats,
+                    expires_at__gt=timezone.now(),
+                )
+                conflicts = active_holds.exclude(held_by=client_id)
+                if conflicts.exists():
+                    conflict_ids = list(conflicts.values_list("seat_id", flat=True))
+                    raise serializers.ValidationError(
+                        {"seat_ids": conflict_ids, "detail": "One or more seats are held by another user."}
+                    )
+                
             reservation = Reservation.objects.create(**validated_data)
 
             try:

@@ -10,7 +10,15 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 import os
 
 from django.core.asgi import get_asgi_application
+import bookings.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cinema_api.settings')
 
-application = get_asgi_application()
+http_app = get_asgi_application()
+
+application = ProtocolTypeRouter(
+    {
+        "http": http_app,
+        "websocket": URLRouter(bookings.routing.websocket_urlpatterns),
+    }
+)
