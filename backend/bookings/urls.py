@@ -9,6 +9,7 @@ from .views import (
     ReservedSeatViewSet,
 )
 
+
 router = DefaultRouter()
 router.register(r"movies", MovieViewSet, basename="movie")
 router.register(r"halls", HallViewSet, basename="hall")
