@@ -1,6 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+
 class ScreeningConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.screening_id = self.scope["url_route"]["kwargs"]["screening_id"]

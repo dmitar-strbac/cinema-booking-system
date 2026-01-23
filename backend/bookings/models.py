@@ -1,5 +1,7 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -60,6 +62,20 @@ class Seat(models.Model):
 
     def __str__(self) -> str:
         return f"{self.hall.name} – row {self.row}, seat {self.number}"
+    
+    def clean(self):
+        errors = {}
+        if self.row < 1 or self.row > self.hall.total_rows:
+            errors["row"] = f"Row must be between 1 and {self.hall.total_rows}."
+        if self.number < 1 or self.number > self.hall.seats_per_row:
+            errors["number"] = f"Seat number must be between 1 and {self.hall.seats_per_row}."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
 
 
 class Screening(TimeStampedModel):
@@ -86,6 +102,29 @@ class Screening(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.movie.title} @ {self.start_time:%Y-%m-%d %H:%M}"
+    
+    def clean(self):
+        errors = {}
+
+        if self.end_time <= self.start_time:
+            errors["end_time"] = "End time must be after start time."
+
+        if self.hall_id and self.start_time and self.end_time and self.end_time > self.start_time:
+            overlaps = Screening.objects.filter(
+                hall_id=self.hall_id,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            ).exclude(pk=self.pk)
+
+            if overlaps.exists():
+                errors["start_time"] = "Screening overlaps with an existing screening in this hall."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class Reservation(TimeStampedModel):
