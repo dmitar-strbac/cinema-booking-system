@@ -3,10 +3,10 @@ import { api } from "@/lib/api";
 import { Movie, Screening } from "@/lib/types";
 import Link from "next/link";
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
 export default async function MovieDetailsPage({ params }: Props) {
-  const movieId = params.id;
+  const { id: movieId } = await params;
 
   const movie = await api<Movie>(`/movies/${movieId}/`);
   const screenings = await api<Screening[]>("/screenings/");
