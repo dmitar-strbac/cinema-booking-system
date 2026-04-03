@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getClientId } from "@/lib/clientId";
 import { connectScreeningWS } from "@/lib/ws";
@@ -11,25 +12,18 @@ import ReservationForm from "@/components/ReservationForm";
 
 type Props = { params: Promise<{ id: string }> };
 
-function seatLabelFromSeat(seat: SeatMapSeat) {
-  return `Row ${seat.row} Seat ${seat.number}`;
-}
-
 export default function SeatsPage({ params }: Props) {
   const { id } = use(params);
   const screeningId = Number(id);
+  const router = useRouter();
   const clientId = useMemo(() => getClientId(), []);
   const [loading, setLoading] = useState(true);
   const [busyHold, setBusyHold] = useState(false);
+  const [submittingReservation, setSubmittingReservation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [seats, setSeats] = useState<SeatMapSeat[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-
-  const [success, setSuccess] = useState<{
-    reservationId: number;
-    seatsText: string[];
-  } | null>(null);
 
   const selectedRef = useRef<Set<number>>(new Set());
   selectedRef.current = selected;
@@ -43,6 +37,7 @@ export default function SeatsPage({ params }: Props) {
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       setError(null);
       setLoading(true);
@@ -56,10 +51,11 @@ export default function SeatsPage({ params }: Props) {
         }
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [screeningId]);
+  }, [screeningId, clientId]);
 
   useEffect(() => {
     const cleanup = connectScreeningWS(
@@ -74,8 +70,9 @@ export default function SeatsPage({ params }: Props) {
       },
       () => {}
     );
+
     return cleanup;
-  }, [screeningId]); 
+  }, [screeningId, clientId]);
 
   useEffect(() => {
     async function releaseAll() {
@@ -92,13 +89,13 @@ export default function SeatsPage({ params }: Props) {
     }
 
     const onBeforeUnload = () => {
-      releaseAll();
+      void releaseAll();
     };
 
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      releaseAll();
+      void releaseAll();
     };
   }, [clientId, screeningId]);
 
@@ -123,7 +120,6 @@ export default function SeatsPage({ params }: Props) {
   }
 
   async function toggleSeat(seatId: number) {
-    setSuccess(null);
     setError(null);
 
     const seat = seatById.get(seatId);
@@ -135,12 +131,13 @@ export default function SeatsPage({ params }: Props) {
     const prev = selected;
     const next = new Set(selected);
     const removing = next.has(seatId);
+
     if (removing) next.delete(seatId);
     else next.add(seatId);
 
     setSelected(next);
-
     setBusyHold(true);
+
     try {
       if (removing) {
         await releaseSeats([seatId]);
@@ -158,35 +155,37 @@ export default function SeatsPage({ params }: Props) {
 
   async function submitReservation(payload: { name: string; email: string }) {
     setError(null);
-    setSuccess(null);
+    setSubmittingReservation(true);
 
-    const seatIds = Array.from(selected);
-    if (!seatIds.length) return;
+    try {
+      const seatIds = Array.from(selected);
+      if (!seatIds.length) return;
 
-    const res = await api<Reservation>(`/reservations/`, {
-      method: "POST",
-      body: {
-        screening: screeningId,
-        customer_name: payload.name,
-        customer_email: payload.email,
-        seat_ids: seatIds,
-        client_id: clientId,
-      },
-    });
+      const res = await api<Reservation>(`/reservations/`, {
+        method: "POST",
+        body: {
+          screening: screeningId,
+          customer_name: payload.name,
+          customer_email: payload.email,
+          seat_ids: seatIds,
+          client_id: clientId,
+        },
+      });
 
-    await fetchSeatMap();
-    setSelected(new Set());
-
-    const seatsText = seatIds
-      .map((id) => seatById.get(id))
-      .filter(Boolean)
-      .map((s) => seatLabelFromSeat(s!));
-
-    setSuccess({
-      reservationId: res.id,
-      seatsText,
-    });
+      setSelected(new Set());
+      router.push(`/payments/${res.id}`);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to create reservation.");
+      await fetchSeatMap().catch(() => {});
+    } finally {
+      setSubmittingReservation(false);
+    }
   }
+
+  const selectedSeatsText = Array.from(selected)
+    .map((id) => seatById.get(id))
+    .filter(Boolean)
+    .map((seat) => `Row ${seat!.row} Seat ${seat!.number}`);
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -195,9 +194,7 @@ export default function SeatsPage({ params }: Props) {
       </Link>
 
       <h1 className="text-2xl font-semibold mt-3">Seat selection</h1>
-      <p className="text-sm text-gray-600 mt-1">
-        Screening #{screeningId}
-      </p>
+      <p className="text-sm text-gray-600 mt-1">Screening #{screeningId}</p>
 
       {loading ? (
         <div className="mt-6 rounded-xl border p-4">
@@ -225,44 +222,55 @@ export default function SeatsPage({ params }: Props) {
 
       {!loading && !error ? (
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-4">
-            <div className="rounded-xl border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="font-semibold">Hall seats</h2>
-                <div className="text-xs text-gray-600">
-                  Client: <span className="font-mono">{clientId.slice(0, 8)}…</span>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <SeatMap seats={seats} selectedIds={selected} onToggle={toggleSeat} />
-              </div>
-
+          <div className="rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="font-semibold">Choose your seats</h2>
               {busyHold ? (
-                <p className="text-xs text-gray-600 mt-3">Updating seats...</p>
+                <span className="text-sm text-gray-600">Updating seats...</span>
               ) : null}
             </div>
 
-            {success ? (
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-green-700 font-medium">
-                  Reservation successful! (#{success.reservationId})
-                </p>
-                <p className="text-sm text-gray-700 mt-2">Reserved seats:</p>
-                <ul className="mt-1 list-disc pl-5 text-sm text-gray-700">
-                  {success.seatsText.map((t) => (
-                    <li key={t}>{t}</li>
+            <div className="mt-4">
+              <SeatMap
+                seats={seats}
+                selectedIds={selected}
+                onToggle={toggleSeat}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border p-4">
+              <h3 className="font-semibold">Selection summary</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {selectedSeatsText.length
+                  ? `${selectedSeatsText.length} seat(s) selected`
+                  : "No seats selected yet."}
+              </p>
+
+              {selectedSeatsText.length ? (
+                <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                  {selectedSeatsText.map((label) => (
+                    <li key={label}>{label}</li>
                   ))}
                 </ul>
+              ) : null}
+            </div>
+
+            <ReservationForm
+              disabled={busyHold || submittingReservation}
+              selectedCount={selected.size}
+              onSubmit={submitReservation}
+            />
+
+            {submittingReservation ? (
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-gray-600">
+                  Creating reservation and redirecting to payment...
+                </p>
               </div>
             ) : null}
           </div>
-
-          <ReservationForm
-            disabled={busyHold}
-            selectedCount={selected.size}
-            onSubmit={submitReservation}
-          />
         </div>
       ) : null}
     </main>
