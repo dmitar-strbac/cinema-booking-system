@@ -3,6 +3,8 @@ from datetime import timedelta
 from rest_framework.test import APITestCase
 from rest_framework import status
 from .models import Movie, Hall, Seat, Screening, Reservation, ReservedSeat, SeatHold
+from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 
 
 class ReservationFlowTests(APITestCase):
@@ -137,3 +139,78 @@ class ReservationFlowTests(APITestCase):
 
         resp = self.client.post(self.reservation_url, payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_screening_end_time_must_be_after_start_time(self):
+        now = timezone.now()
+        bad = Screening(
+            movie=self.movie,
+            hall=self.hall,
+            start_time=now + timedelta(days=2),
+            end_time=now + timedelta(days=2) - timedelta(minutes=1),
+            language="EN",
+            is_3d=False,
+            base_price="500.00",
+        )
+        with self.assertRaises(ValidationError):
+            bad.full_clean()
+
+    def test_screenings_cannot_overlap_in_same_hall(self):
+        overlap = Screening(
+            movie=self.movie,
+            hall=self.hall,
+            start_time=self.screening.start_time + timedelta(minutes=30),
+            end_time=self.screening.end_time + timedelta(minutes=30),
+            language="EN",
+            is_3d=False,
+            base_price="500.00",
+        )
+        with self.assertRaises(ValidationError):
+            overlap.full_clean()
+
+    def test_seat_row_and_number_must_fit_hall_layout(self):
+        bad_seat = Seat(hall=self.hall, row=99, number=1, is_wheelchair=False)
+        with self.assertRaises(ValidationError):
+            bad_seat.full_clean()
+
+        bad_seat2 = Seat(hall=self.hall, row=1, number=99, is_wheelchair=False)
+        with self.assertRaises(ValidationError):
+            bad_seat2.full_clean()
+
+    def test_anonymous_user_cannot_create_movie(self):
+        payload = {
+            "title": "Interstellar",
+            "description": "Test movie",
+            "duration_minutes": 169,
+            "genre": "SCIFI",
+            "release_year": 2014,
+        }
+
+        resp = self.client.post("/api/movies/", payload, format="json")
+
+        self.assertIn(
+            resp.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
+
+    def test_admin_user_can_create_movie(self):
+        User = get_user_model()
+        admin = User.objects.create_superuser(
+            username="admin",
+            email="admin@test.com",
+            password="password123",
+        )
+
+        self.client.force_authenticate(user=admin)
+
+        payload = {
+            "title": "Interstellar",
+            "description": "Test movie",
+            "duration_minutes": 169,
+            "genre": "SCIFI",
+            "release_year": 2014,
+        }
+
+        resp = self.client.post("/api/movies/", payload, format="json")
+
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Movie.objects.filter(title="Interstellar").exists())
