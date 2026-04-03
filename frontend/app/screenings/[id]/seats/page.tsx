@@ -64,8 +64,7 @@ export default function SeatsPage({ params }: Props) {
         if (evt?.event === "hold_updated") {
           try {
             await fetchSeatMap();
-          } catch {
-          }
+          } catch {}
         }
       },
       () => {}
@@ -84,8 +83,7 @@ export default function SeatsPage({ params }: Props) {
           method: "POST",
           body: { client_id: clientId, seat_ids: ids },
         });
-      } catch {
-      }
+      } catch {}
     }
 
     const onBeforeUnload = () => {
@@ -124,7 +122,6 @@ export default function SeatsPage({ params }: Props) {
 
     const seat = seatById.get(seatId);
     if (!seat) return;
-
     if (seat.is_reserved) return;
     if (seat.is_held && !seat.held_by_me) return;
 
@@ -185,28 +182,32 @@ export default function SeatsPage({ params }: Props) {
   const selectedSeatsText = Array.from(selected)
     .map((id) => seatById.get(id))
     .filter(Boolean)
-    .map((seat) => `Row ${seat!.row} Seat ${seat!.number}`);
+    .map((seat) => `Row ${seat!.row} • Seat ${seat!.number}`);
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <Link href="/movies" className="text-sm underline text-gray-700">
-        ← Back to movies
-      </Link>
+    <main className="page-shell py-10 md:py-14">
 
-      <h1 className="text-2xl font-semibold mt-3">Seat selection</h1>
-      <p className="text-sm text-gray-600 mt-1">Screening #{screeningId}</p>
+      <section className="fade-in mt-6">
+        <p className="text-sm uppercase tracking-[0.28em] text-yellow-300/80">
+          Seat booking
+        </p>
+        <h1 className="mt-3 text-4xl font-semibold text-white md:text-5xl">
+          Choose your seats
+        </h1>
+        <p className="mt-3 text-base text-white/60">Screening #{screeningId}</p>
+      </section>
 
       {loading ? (
-        <div className="mt-6 rounded-xl border p-4">
-          <p className="text-sm text-gray-600">Loading seat map...</p>
+        <div className="glass-card shimmer mt-8 rounded-[28px] p-6">
+          <p className="text-sm text-white/60">Loading seat map...</p>
         </div>
       ) : null}
 
       {error ? (
-        <div className="mt-6 rounded-xl border p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="glass-card mt-8 rounded-[28px] p-6">
+          <p className="text-sm text-rose-300">{error}</p>
           <button
-            className="mt-3 rounded-lg border px-3 py-2 text-sm"
+            className="mt-4 rounded-full border border-white/12 bg-white/5 px-4 py-2 text-sm text-white"
             onClick={() => {
               setLoading(true);
               fetchSeatMap()
@@ -221,37 +222,46 @@ export default function SeatsPage({ params }: Props) {
       ) : null}
 
       {!loading && !error ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="rounded-xl border p-4">
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="glass-card fade-in rounded-[28px] p-5 md:p-7">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="font-semibold">Choose your seats</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Interactive seat map</h2>
+                <p className="mt-1 text-sm text-white/55">
+                  Select available seats and continue to payment.
+                </p>
+              </div>
+
               {busyHold ? (
-                <span className="text-sm text-gray-600">Updating seats...</span>
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-medium text-yellow-200">
+                  Updating...
+                </span>
               ) : null}
             </div>
 
-            <div className="mt-4">
-              <SeatMap
-                seats={seats}
-                selectedIds={selected}
-                onToggle={toggleSeat}
-              />
+            <div className="mt-6">
+              <SeatMap seats={seats} selectedIds={selected} onToggle={toggleSeat} />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-xl border p-4">
-              <h3 className="font-semibold">Selection summary</h3>
-              <p className="text-sm text-gray-600 mt-1">
+          <div className="space-y-5">
+            <div className="glass-card fade-in-delay rounded-[28px] p-6">
+              <h3 className="text-lg font-semibold text-white">Selection summary</h3>
+              <p className="mt-2 text-sm text-white/60">
                 {selectedSeatsText.length
                   ? `${selectedSeatsText.length} seat(s) selected`
                   : "No seats selected yet."}
               </p>
 
               {selectedSeatsText.length ? (
-                <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                <ul className="mt-4 space-y-2 text-sm text-white/80">
                   {selectedSeatsText.map((label) => (
-                    <li key={label}>{label}</li>
+                    <li
+                      key={label}
+                      className="rounded-2xl border border-white/8 bg-white/5 px-3 py-2"
+                    >
+                      {label}
+                    </li>
                   ))}
                 </ul>
               ) : null}
@@ -264,8 +274,8 @@ export default function SeatsPage({ params }: Props) {
             />
 
             {submittingReservation ? (
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-gray-600">
+              <div className="glass-card rounded-[24px] p-4">
+                <p className="text-sm text-white/65">
                   Creating reservation and redirecting to payment...
                 </p>
               </div>
