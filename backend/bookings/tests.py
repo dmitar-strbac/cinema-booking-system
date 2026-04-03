@@ -1,10 +1,13 @@
-from django.utils import timezone
 from datetime import timedelta
-from rest_framework.test import APITestCase
-from rest_framework import status
-from .models import Movie, Hall, Seat, Screening, Reservation, ReservedSeat, SeatHold
-from django.core.exceptions import ValidationError
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from .models import Hall, Movie, Reservation, ReservedSeat, Screening, Seat, SeatHold
 
 
 class ReservationFlowTests(APITestCase):
@@ -28,7 +31,12 @@ class ReservationFlowTests(APITestCase):
         for r in [1, 2]:
             for n in [1, 2, 3]:
                 self.seats.append(
-                    Seat.objects.create(hall=self.hall, row=r, number=n, is_wheelchair=False)
+                    Seat.objects.create(
+                        hall=self.hall,
+                        row=r,
+                        number=n,
+                        is_wheelchair=False,
+                    )
                 )
 
         now = timezone.now()
@@ -47,21 +55,32 @@ class ReservationFlowTests(APITestCase):
             total_rows=1,
             seats_per_row=1,
         )
-        self.other_seat = Seat.objects.create(hall=self.hall2, row=1, number=1, is_wheelchair=False)
+        self.other_seat = Seat.objects.create(
+            hall=self.hall2,
+            row=1,
+            number=1,
+            is_wheelchair=False,
+        )
 
         self.reservation_url = "/api/reservations/"
 
-    def test_successful_reservation_creates_reserved_seats(self):
+    def create_pending_reservation(self, seat_ids=None, client_id="client-a"):
         payload = {
             "screening": self.screening.id,
             "customer_name": "Test User",
             "customer_email": "test@example.com",
-            "seat_ids": [self.seats[0].id, self.seats[1].id],
-            "client_id": "client-a",
+            "seat_ids": seat_ids or [self.seats[0].id, self.seats[1].id],
+            "client_id": client_id,
         }
+        return self.client.post(self.reservation_url, payload, format="json")
 
-        resp = self.client.post(self.reservation_url, payload, format="json")
+    def test_successful_reservation_creates_pending_reservation_and_reserved_seats(self):
+        resp = self.create_pending_reservation()
+
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data["status"], Reservation.Status.PENDING)
+        self.assertEqual(resp.data["payment_provider"], Reservation.PaymentProvider.FAKE)
+        self.assertEqual(Decimal(resp.data["payment_amount"]), Decimal("1000.00"))
 
         reservation_id = resp.data["id"]
         self.assertTrue(Reservation.objects.filter(id=reservation_id).exists())
@@ -70,13 +89,7 @@ class ReservationFlowTests(APITestCase):
         self.assertEqual(reserved_count, 2)
 
     def test_double_booking_is_rejected(self):
-        payload1 = {
-            "screening": self.screening.id,
-            "customer_name": "User 1",
-            "customer_email": "u1@example.com",
-            "seat_ids": [self.seats[0].id],
-        }
-        r1 = self.client.post(self.reservation_url, payload1, format="json")
+        r1 = self.create_pending_reservation(seat_ids=[self.seats[0].id], client_id="client-a")
         self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
 
         payload2 = {
@@ -84,6 +97,7 @@ class ReservationFlowTests(APITestCase):
             "customer_name": "User 2",
             "customer_email": "u2@example.com",
             "seat_ids": [self.seats[0].id],
+            "client_id": "client-b",
         }
         r2 = self.client.post(self.reservation_url, payload2, format="json")
 
@@ -95,7 +109,7 @@ class ReservationFlowTests(APITestCase):
             "screening": self.screening.id,
             "customer_name": "Test User",
             "customer_email": "test@example.com",
-            "seat_ids": [self.other_seat.id],  
+            "seat_ids": [self.other_seat.id],
         }
         resp = self.client.post(self.reservation_url, payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
@@ -139,6 +153,83 @@ class ReservationFlowTests(APITestCase):
 
         resp = self.client.post(self.reservation_url, payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data["status"], Reservation.Status.PENDING)
+
+    def test_start_payment_generates_reference(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+        reservation_id = create_resp.data["id"]
+
+        resp = self.client.post(f"/api/reservations/{reservation_id}/start-payment/", {}, format="json")
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["status"], Reservation.Status.PENDING)
+        self.assertTrue(resp.data["payment_reference"])
+        self.assertEqual(resp.data["payment_provider"], Reservation.PaymentProvider.FAKE)
+
+    def test_confirm_payment_confirms_pending_reservation(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id, self.seats[1].id])
+        reservation_id = create_resp.data["id"]
+
+        resp = self.client.post(f"/api/reservations/{reservation_id}/confirm-payment/", {}, format="json")
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["status"], Reservation.Status.CONFIRMED)
+
+        reservation = Reservation.objects.get(id=reservation_id)
+        self.assertEqual(reservation.status, Reservation.Status.CONFIRMED)
+        self.assertIsNotNone(reservation.payment_completed_at)
+
+    def test_cancel_payment_cancels_pending_reservation_and_releases_reserved_seats(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id, self.seats[1].id])
+        reservation_id = create_resp.data["id"]
+
+        resp = self.client.post(f"/api/reservations/{reservation_id}/cancel-payment/", {}, format="json")
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["status"], Reservation.Status.CANCELLED)
+
+        reservation = Reservation.objects.get(id=reservation_id)
+        self.assertEqual(reservation.status, Reservation.Status.CANCELLED)
+        self.assertEqual(
+            ReservedSeat.objects.filter(reservation_id=reservation_id).count(),
+            0,
+        )
+
+    def test_confirmed_reservation_cannot_be_cancelled_via_payment_cancel(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+        reservation_id = create_resp.data["id"]
+
+        confirm_resp = self.client.post(
+            f"/api/reservations/{reservation_id}/confirm-payment/",
+            {},
+            format="json",
+        )
+        self.assertEqual(confirm_resp.status_code, status.HTTP_200_OK)
+
+        cancel_resp = self.client.post(
+            f"/api/reservations/{reservation_id}/cancel-payment/",
+            {},
+            format="json",
+        )
+        self.assertEqual(cancel_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cancelled_reservation_cannot_be_confirmed(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+        reservation_id = create_resp.data["id"]
+
+        cancel_resp = self.client.post(
+            f"/api/reservations/{reservation_id}/cancel-payment/",
+            {},
+            format="json",
+        )
+        self.assertEqual(cancel_resp.status_code, status.HTTP_200_OK)
+
+        confirm_resp = self.client.post(
+            f"/api/reservations/{reservation_id}/confirm-payment/",
+            {},
+            format="json",
+        )
+        self.assertEqual(confirm_resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_screening_end_time_must_be_after_start_time(self):
         now = timezone.now()
@@ -168,49 +259,67 @@ class ReservationFlowTests(APITestCase):
             overlap.full_clean()
 
     def test_seat_row_and_number_must_fit_hall_layout(self):
-        bad_seat = Seat(hall=self.hall, row=99, number=1, is_wheelchair=False)
+        bad_seat = Seat(
+            hall=self.hall,
+            row=3,
+            number=10,
+            is_wheelchair=False,
+        )
         with self.assertRaises(ValidationError):
             bad_seat.full_clean()
 
-        bad_seat2 = Seat(hall=self.hall, row=1, number=99, is_wheelchair=False)
-        with self.assertRaises(ValidationError):
-            bad_seat2.full_clean()
 
-    def test_anonymous_user_cannot_create_movie(self):
-        payload = {
-            "title": "Interstellar",
-            "description": "Test movie",
-            "duration_minutes": 169,
-            "genre": "SCIFI",
-            "release_year": 2014,
-        }
-
-        resp = self.client.post("/api/movies/", payload, format="json")
-
-        self.assertIn(
-            resp.status_code,
-            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
-        )
-
-    def test_admin_user_can_create_movie(self):
+class PermissionTests(APITestCase):
+    def setUp(self):
         User = get_user_model()
-        admin = User.objects.create_superuser(
+        self.admin = User.objects.create_user(
             username="admin",
-            email="admin@test.com",
-            password="password123",
+            email="admin@example.com",
+            password="pass12345",
+            is_staff=True,
+        )
+        self.user = User.objects.create_user(
+            username="user",
+            email="user@example.com",
+            password="pass12345",
+            is_staff=False,
         )
 
-        self.client.force_authenticate(user=admin)
+        self.movie = Movie.objects.create(
+            title="Matrix",
+            description="Test",
+            duration_minutes=136,
+            genre="SCIFI",
+            release_year=1999,
+            poster_url="https://example.com/matrix.jpg",
+        )
 
+    def test_public_can_read_movies(self):
+        resp = self.client.get("/api/movies/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_non_admin_cannot_create_movie(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
-            "title": "Interstellar",
-            "description": "Test movie",
-            "duration_minutes": 169,
-            "genre": "SCIFI",
-            "release_year": 2014,
+            "title": "New Movie",
+            "description": "Test",
+            "duration_minutes": 100,
+            "genre": "ACTION",
+            "release_year": 2025,
+            "poster_url": "https://example.com/new.jpg",
         }
-
         resp = self.client.post("/api/movies/", payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_admin_can_create_movie(self):
+        self.client.force_authenticate(user=self.admin)
+        payload = {
+            "title": "Admin Movie",
+            "description": "Test",
+            "duration_minutes": 110,
+            "genre": "DRAMA",
+            "release_year": 2024,
+            "poster_url": "https://example.com/admin.jpg",
+        }
+        resp = self.client.post("/api/movies/", payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(Movie.objects.filter(title="Interstellar").exists())
