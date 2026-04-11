@@ -1,4 +1,9 @@
 import uuid
+import base64
+import io
+
+import qrcode
+from django.http import JsonResponse
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
@@ -271,6 +276,9 @@ class ReservationViewSet(viewsets.ModelViewSet):
             if not reservation.payment_reference:
                 reservation.payment_reference = f"fakepay_{reservation.id}_{uuid.uuid4().hex[:12]}"
 
+            if not reservation.ticket_code:
+                reservation.ticket_code = f"TICKET-{reservation.id}-{uuid.uuid4().hex[:8].upper()}"
+
             reservation.status = Reservation.Status.CONFIRMED
             reservation.payment_completed_at = timezone.now()
             reservation.save(
@@ -278,6 +286,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
                     "status",
                     "payment_reference",
                     "payment_completed_at",
+                    "ticket_code",
                     "updated_at",
                 ]
             )
@@ -335,6 +344,52 @@ class ReservationViewSet(viewsets.ModelViewSet):
         )
         return Response(
             {"id": reservation.id, "status": reservation.status},
+            status=status.HTTP_200_OK,
+        )
+    
+    @action(detail=True, methods=["get"], url_path="qr", permission_classes=[AllowAny])
+    def qr(self, request, pk=None):
+        reservation = self.get_object()
+
+        if reservation.status != Reservation.Status.CONFIRMED:
+            return Response(
+                {"detail": "QR code is available only for confirmed reservations."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not reservation.ticket_code:
+            reservation.ticket_code = f"TICKET-{reservation.id}-{uuid.uuid4().hex[:8].upper()}"
+            reservation.save(update_fields=["ticket_code", "updated_at"])
+
+        qr_payload = (
+            f"Cinema Ticket\n"
+            f"Reservation: {reservation.id}\n"
+            f"Ticket: {reservation.ticket_code}\n"
+            f"Customer: {reservation.customer_name}\n"
+            f"Screening: {reservation.screening_id}\n"
+            f"Status: {reservation.status}"
+        )
+
+        qr = qrcode.QRCode(
+            version=1,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_payload)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        qr_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        return Response(
+            {
+                "reservation_id": reservation.id,
+                "ticket_code": reservation.ticket_code,
+                "qr_image_base64": qr_base64,
+            },
             status=status.HTTP_200_OK,
         )
 

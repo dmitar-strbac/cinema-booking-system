@@ -156,6 +156,7 @@ class Reservation(TimeStampedModel):
     payment_reference = models.CharField(max_length=100, blank=True)
     payment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     payment_completed_at = models.DateTimeField(blank=True, null=True)
+    ticket_code = models.CharField(max_length=64, unique=True, blank=True, null=True)
 
     def __str__(self) -> str:
         return f"Reservation #{self.id} for {self.screening}"
