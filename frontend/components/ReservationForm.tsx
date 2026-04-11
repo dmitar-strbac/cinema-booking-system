@@ -54,7 +54,7 @@ export default function ReservationForm({ disabled, selectedCount, onSubmit }: P
         {err ? <p className="text-sm text-rose-300">{err}</p> : null}
 
         <button
-          className="rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
+          className="cursor-pointer rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
           disabled={!canSubmit}
           onClick={async () => {
             setErr(null);

@@ -268,6 +268,30 @@ class ReservationFlowTests(APITestCase):
         with self.assertRaises(ValidationError):
             bad_seat.full_clean()
 
+    def test_confirmed_reservation_returns_qr_code(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+        reservation_id = create_resp.data["id"]
+
+        confirm_resp = self.client.post(
+            f"/api/reservations/{reservation_id}/confirm-payment/",
+            {},
+            format="json",
+        )
+        self.assertEqual(confirm_resp.status_code, status.HTTP_200_OK)
+
+        qr_resp = self.client.get(f"/api/reservations/{reservation_id}/qr/")
+        self.assertEqual(qr_resp.status_code, status.HTTP_200_OK)
+        self.assertIn("ticket_code", qr_resp.data)
+        self.assertIn("qr_image_base64", qr_resp.data)
+        self.assertTrue(qr_resp.data["qr_image_base64"])
+
+    def test_pending_reservation_cannot_access_qr_code(self):
+        create_resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+        reservation_id = create_resp.data["id"]
+
+        qr_resp = self.client.get(f"/api/reservations/{reservation_id}/qr/")
+        self.assertEqual(qr_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class PermissionTests(APITestCase):
     def setUp(self):

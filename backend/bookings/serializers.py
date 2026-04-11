@@ -86,6 +86,7 @@ class ReservationSerializer(serializers.ModelSerializer):
             "payment_reference",
             "payment_amount",
             "payment_completed_at",
+            "ticket_code",
             "created_at",
             "updated_at",
             "reserved_seats",
@@ -118,6 +119,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             "payment_reference",
             "payment_amount",
             "payment_completed_at",
+            "ticket_code",
             "created_at",
         ]
         read_only_fields = [
@@ -127,6 +129,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             "payment_reference",
             "payment_amount",
             "payment_completed_at",
+            "ticket_code",
             "created_at",
         ]
 

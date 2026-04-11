@@ -70,3 +70,9 @@ export type StartPaymentResponse = {
   payment_amount: string;
   currency: string;
 };
+
+export type ReservationQrResponse = {
+  reservation_id: number;
+  ticket_code: string;
+  qr_image_base64: string;
+};

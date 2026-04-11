@@ -237,7 +237,7 @@ export default function PaymentPage({ params }: Props) {
               type="button"
               onClick={() => setShowModal(true)}
               disabled={busy}
-              className="rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black shadow-xl shadow-yellow-500/20 disabled:opacity-60"
+              className="cursor-pointer disabled:cursor-not-allowed rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black shadow-xl shadow-yellow-500/20 disabled:opacity-60"
             >
               Open payment modal
             </button>
@@ -246,7 +246,7 @@ export default function PaymentPage({ params }: Props) {
               type="button"
               onClick={handleCancel}
               disabled={busy}
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+              className="cursor-pointer disabled:cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
             >
               Cancel payment
             </button>
@@ -270,7 +270,7 @@ export default function PaymentPage({ params }: Props) {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/70"
+                className="cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/70"
               >
                 ✕
               </button>
@@ -280,7 +280,7 @@ export default function PaymentPage({ params }: Props) {
               <button
                 type="button"
                 onClick={() => setMethod("card")}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm ${
+                className={`cursor-pointer rounded-2xl border px-4 py-3 text-left text-sm ${
                   method === "card"
                     ? "border-indigo-400 bg-indigo-400/10 text-white"
                     : "border-white/10 bg-white/5 text-white/65"
@@ -374,7 +374,7 @@ export default function PaymentPage({ params }: Props) {
                 type="button"
                 onClick={handlePayNow}
                 disabled={busy || !isValid}
-                className="rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-40"
+                className="cursor-pointer disabled:cursor-not-allowed rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-40"
               >
                 {busy ? "Processing payment..." : `Pay ${paymentInfo.payment_amount} ${paymentInfo.currency}`}
               </button>
@@ -383,7 +383,7 @@ export default function PaymentPage({ params }: Props) {
                 type="button"
                 onClick={() => setShowModal(false)}
                 disabled={busy}
-                className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
+                className="cursor-pointer disabled:cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
               >
                 Continue editing
               </button>
