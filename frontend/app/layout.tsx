@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`cinema-bg ${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-screen">
           <header className="sticky top-0 z-30 border-b border-white/8 bg-black/30 backdrop-blur-xl">
             <div className="page-shell flex h-16 items-center justify-between">
