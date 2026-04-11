@@ -47,12 +47,26 @@ export type Reservation = {
   screening: number;
   customer_name: string;
   customer_email: string;
-  status: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  payment_provider?: string;
+  payment_reference?: string;
+  payment_amount?: string;
+  payment_completed_at?: string | null;
   created_at: string;
+  updated_at?: string;
   reserved_seats?: Array<{
     id: number;
     reservation: number;
     screening: number;
     seat: number;
   }>;
+};
+
+export type StartPaymentResponse = {
+  reservation_id: number;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  payment_provider: string;
+  payment_reference: string;
+  payment_amount: string;
+  currency: string;
 };

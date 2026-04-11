@@ -18,14 +18,26 @@ export default function SeatMap({ seats, selectedIds, onToggle }: Props) {
   for (const s of seats) byPos.set(`${s.row}:${s.number}`, s);
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs text-gray-600">
-        <span className="font-medium">Legend:</span>{" "}
-        <span>available</span> • <span>selected</span> • <span>held</span> • <span>reserved</span>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+        <div className="mx-auto mb-5 h-3 w-full max-w-xl rounded-full bg-gradient-to-r from-yellow-400/70 via-amber-200/90 to-yellow-400/70 shadow-[0_0_30px_rgba(246,196,83,0.18)]" />
+        <p className="text-center text-xs uppercase tracking-[0.28em] text-white/45">
+          Screen
+        </p>
       </div>
 
-      <div className="inline-block rounded-xl border p-3 overflow-auto max-w-full">
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${maxNum}, minmax(36px, 36px))` }}>
+      <div className="flex flex-wrap gap-2 text-xs text-white/60">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">available</span>
+        <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-yellow-100">held by you</span>
+        <span className="rounded-full border border-yellow-300/20 bg-gradient-to-r from-yellow-400 to-amber-300 px-3 py-1 font-medium text-black">selected</span>
+        <span className="rounded-full border border-white/8 bg-white/10 px-3 py-1 text-white/40">held/reserved</span>
+      </div>
+
+      <div className="overflow-auto rounded-[24px] border border-white/8 bg-black/15 p-4">
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${maxNum}, minmax(38px, 38px))` }}
+        >
           {Array.from({ length: maxRow }).flatMap((_, rIdx) => {
             const row = rIdx + 1;
             return Array.from({ length: maxNum }).map((_, cIdx) => {
@@ -33,7 +45,7 @@ export default function SeatMap({ seats, selectedIds, onToggle }: Props) {
               const seat = byPos.get(`${row}:${number}`);
 
               if (!seat) {
-                return <div key={`${row}-${number}`} className="h-9 w-9" />;
+                return <div key={`${row}-${number}`} className="h-10 w-10" />;
               }
 
               const isSelected = selectedIds.has(seat.id);
@@ -42,14 +54,14 @@ export default function SeatMap({ seats, selectedIds, onToggle }: Props) {
               const disabled = isReserved || isHeldByOther;
 
               const base =
-                "h-9 w-9 rounded-md text-[10px] flex items-center justify-center border transition select-none";
+                "h-10 w-10 rounded-xl text-[10px] font-medium flex items-center justify-center border transition select-none";
               const cls = disabled
-                ? `${base} bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed`
+                ? `${base} border-white/8 bg-white/10 text-white/30 cursor-not-allowed`
                 : isSelected
-                ? `${base} bg-black text-white border-black cursor-pointer`
+                ? `${base} border-yellow-200 bg-gradient-to-r from-yellow-400 to-amber-300 text-black shadow-lg shadow-yellow-500/20 cursor-pointer`
                 : seat.is_held && seat.held_by_me
-                ? `${base} bg-yellow-100 text-yellow-900 border-yellow-200 cursor-pointer`
-                : `${base} bg-white text-gray-800 border-gray-200 hover:shadow-sm cursor-pointer`;
+                ? `${base} border-yellow-400/25 bg-yellow-400/10 text-yellow-100 cursor-pointer`
+                : `${base} border-white/10 bg-white/5 text-white/80 hover:border-yellow-300/30 hover:bg-white/8 cursor-pointer`;
 
               return (
                 <button

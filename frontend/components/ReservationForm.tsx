@@ -24,37 +24,37 @@ export default function ReservationForm({ disabled, selectedCount, onSubmit }: P
   }, [disabled, submitting, selectedCount, name, email]);
 
   return (
-    <div className="rounded-xl border p-4">
-      <h3 className="font-semibold">Reserve tickets</h3>
-      <p className="text-sm text-gray-600 mt-1">
-        Selected seats: <span className="font-medium">{selectedCount}</span>
+    <div className="glass-card fade-in-delay rounded-[28px] p-6">
+      <h3 className="text-lg font-semibold text-white">Reserve tickets</h3>
+      <p className="mt-2 text-sm text-white/60">
+        Selected seats: <span className="font-medium text-yellow-200">{selectedCount}</span>
       </p>
 
-      <div className="mt-4 grid gap-3">
-        <label className="grid gap-1">
-          <span className="text-sm">Name</span>
+      <div className="mt-5 grid gap-4">
+        <label className="grid gap-2">
+          <span className="text-sm text-white/75">Name</span>
           <input
-            className="rounded-lg border px-3 py-2"
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400/30 focus:bg-white/7"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
+            placeholder="Your full name"
           />
         </label>
 
-        <label className="grid gap-1">
-          <span className="text-sm">Email</span>
+        <label className="grid gap-2">
+          <span className="text-sm text-white/75">Email</span>
           <input
-            className="rounded-lg border px-3 py-2"
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-yellow-400/30 focus:bg-white/7"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
           />
         </label>
 
-        {err ? <p className="text-sm text-red-700">{err}</p> : null}
+        {err ? <p className="text-sm text-rose-300">{err}</p> : null}
 
         <button
-          className="rounded-lg bg-black text-white px-4 py-2 disabled:opacity-50"
+          className="rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
           disabled={!canSubmit}
           onClick={async () => {
             setErr(null);
@@ -71,7 +71,7 @@ export default function ReservationForm({ disabled, selectedCount, onSubmit }: P
           }}
           type="button"
         >
-          {submitting ? "Reserving..." : "Reserve"}
+          {submitting ? "Reserving..." : "Continue to payment"}
         </button>
       </div>
     </div>

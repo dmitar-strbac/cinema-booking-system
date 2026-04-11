@@ -1,26 +1,21 @@
 export default function Loading() {
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <div className="h-4 w-32 bg-gray-200 rounded" />
-
-      <div className="mt-4 flex gap-6">
-        <div className="h-48 w-36 bg-gray-200 rounded-xl" />
-        <div className="flex-1 space-y-3">
-          <div className="h-7 w-1/2 bg-gray-200 rounded" />
-          <div className="h-4 w-1/3 bg-gray-200 rounded" />
-          <div className="h-4 w-3/4 bg-gray-200 rounded" />
-          <div className="h-4 w-2/3 bg-gray-200 rounded" />
+    <main className="page-shell py-10 md:py-14">
+      <div className="glass-card shimmer rounded-[32px] p-8">
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <div className="aspect-[3/4] rounded-[28px] bg-white/8" />
+          <div className="space-y-4">
+            <div className="h-4 w-28 rounded bg-white/10" />
+            <div className="h-12 w-2/3 rounded bg-white/10" />
+            <div className="h-6 w-1/3 rounded bg-white/10" />
+            <div className="h-28 w-full rounded bg-white/10" />
+          </div>
         </div>
-      </div>
 
-      <div className="mt-8">
-        <div className="h-6 w-28 bg-gray-200 rounded" />
-        <div className="mt-3 space-y-2">
+        <div className="mt-10 space-y-3">
+          <div className="h-6 w-40 rounded bg-white/10" />
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-xl border p-4">
-              <div className="h-5 w-2/3 bg-gray-200 rounded" />
-              <div className="mt-2 h-4 w-1/2 bg-gray-200 rounded" />
-            </div>
+            <div key={i} className="h-20 rounded-[24px] bg-white/8" />
           ))}
         </div>
       </div>

@@ -1,15 +1,16 @@
+from decimal import Decimal
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import serializers
-from django.db import transaction, IntegrityError
 from .models import (
-    Movie,
     Hall,
-    Seat,
-    Screening,
+    Movie,
     Reservation,
     ReservedSeat,
+    Screening,
+    Seat,
     SeatHold,
 )
-from django.utils import timezone
 
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -81,6 +82,10 @@ class ReservationSerializer(serializers.ModelSerializer):
             "customer_name",
             "customer_email",
             "status",
+            "payment_provider",
+            "payment_reference",
+            "payment_amount",
+            "payment_completed_at",
             "created_at",
             "updated_at",
             "reserved_seats",
@@ -91,7 +96,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
     seat_ids = serializers.PrimaryKeyRelatedField(
         queryset=Seat.objects.all(),
         many=True,
-        write_only=True
+        write_only=True,
     )
     client_id = serializers.CharField(
         write_only=True,
@@ -109,9 +114,21 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             "seat_ids",
             "client_id",
             "status",
+            "payment_provider",
+            "payment_reference",
+            "payment_amount",
+            "payment_completed_at",
             "created_at",
         ]
-        read_only_fields = ["id", "status", "created_at"]
+        read_only_fields = [
+            "id",
+            "status",
+            "payment_provider",
+            "payment_reference",
+            "payment_amount",
+            "payment_completed_at",
+            "created_at",
+        ]
 
     def validate(self, attrs):
         screening = attrs["screening"]
@@ -120,9 +137,12 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         hall_seat_ids = set(
             Seat.objects.filter(hall=screening.hall).values_list("id", flat=True)
         )
-        for s in seats:
-            if s.id not in hall_seat_ids:
-                raise serializers.ValidationError("One or more seats do not belong to the screening hall.")
+        for seat in seats:
+            if seat.id not in hall_seat_ids:
+                raise serializers.ValidationError(
+                    "One or more seats do not belong to the screening hall."
+                )
+
         return attrs
 
     def create(self, validated_data):
@@ -133,7 +153,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             SeatHold.objects.filter(
                 screening=screening,
-                expires_at__lte=timezone.now()
+                expires_at__lte=timezone.now(),
             ).delete()
 
             if client_id:
@@ -146,21 +166,42 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
                 if conflicts.exists():
                     conflict_ids = list(conflicts.values_list("seat_id", flat=True))
                     raise serializers.ValidationError(
-                        {"seat_ids": conflict_ids, "detail": "One or more seats are held by another user."}
+                        {
+                            "seat_ids": conflict_ids,
+                            "detail": "One or more seats are held by another user.",
+                        }
                     )
-                
-            reservation = Reservation.objects.create(**validated_data)
+
+            amount = screening.base_price * Decimal(len(seats))
+
+            reservation = Reservation.objects.create(
+                **validated_data,
+                status=Reservation.Status.PENDING,
+                payment_provider=Reservation.PaymentProvider.FAKE,
+                payment_amount=amount,
+            )
 
             try:
-                ReservedSeat.objects.bulk_create([
-                    ReservedSeat(
-                        reservation=reservation,
-                        screening=screening,
-                        seat=seat
-                    )
-                    for seat in seats
-                ])
+                ReservedSeat.objects.bulk_create(
+                    [
+                        ReservedSeat(
+                            reservation=reservation,
+                            screening=screening,
+                            seat=seat,
+                        )
+                        for seat in seats
+                    ]
+                )
             except IntegrityError:
-                raise serializers.ValidationError("One or more selected seats are already reserved.")
+                raise serializers.ValidationError(
+                    "One or more selected seats are already reserved."
+                )
+
+            if client_id:
+                SeatHold.objects.filter(
+                    screening=screening,
+                    seat__in=seats,
+                    held_by=client_id,
+                ).delete()
 
         return reservation

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -62,7 +63,7 @@ class Seat(models.Model):
 
     def __str__(self) -> str:
         return f"{self.hall.name} – row {self.row}, seat {self.number}"
-    
+
     def clean(self):
         errors = {}
         if self.row < 1 or self.row > self.hall.total_rows:
@@ -75,7 +76,6 @@ class Seat(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
-
 
 
 class Screening(TimeStampedModel):
@@ -102,7 +102,7 @@ class Screening(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.movie.title} @ {self.start_time:%Y-%m-%d %H:%M}"
-    
+
     def clean(self):
         errors = {}
 
@@ -133,6 +133,9 @@ class Reservation(TimeStampedModel):
         CONFIRMED = "CONFIRMED", "Confirmed"
         CANCELLED = "CANCELLED", "Cancelled"
 
+    class PaymentProvider(models.TextChoices):
+        FAKE = "FAKE", "Fake"
+
     screening = models.ForeignKey(
         Screening,
         related_name="reservations",
@@ -143,8 +146,16 @@ class Reservation(TimeStampedModel):
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.CONFIRMED,
+        default=Status.PENDING,
     )
+    payment_provider = models.CharField(
+        max_length=20,
+        choices=PaymentProvider.choices,
+        default=PaymentProvider.FAKE,
+    )
+    payment_reference = models.CharField(max_length=100, blank=True)
+    payment_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    payment_completed_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self) -> str:
         return f"Reservation #{self.id} for {self.screening}"
@@ -163,7 +174,7 @@ class ReservedSeat(models.Model):
     )
     seat = models.ForeignKey(
         Seat,
-        related_name="reservations",
+        related_name="reserved_screenings",
         on_delete=models.PROTECT,
     )
 
@@ -171,24 +182,39 @@ class ReservedSeat(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["screening", "seat"],
-                name="unique_seat_per_screening",
+                name="unique_reserved_seat_per_screening",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.seat} ({self.reservation})"
-    
+        return f"{self.screening} - {self.seat}"
 
-class SeatHold(TimeStampedModel):
-    screening = models.ForeignKey(Screening, related_name="seat_holds", on_delete=models.CASCADE)
-    seat = models.ForeignKey(Seat, related_name="holds", on_delete=models.PROTECT)
-    held_by = models.CharField(max_length=64)  
+
+class SeatHold(models.Model):
+    screening = models.ForeignKey(
+        Screening,
+        related_name="seat_holds",
+        on_delete=models.CASCADE,
+    )
+    seat = models.ForeignKey(
+        Seat,
+        related_name="seat_holds",
+        on_delete=models.CASCADE,
+    )
+    held_by = models.CharField(max_length=100)
     expires_at = models.DateTimeField()
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["screening", "seat"], name="unique_hold_per_seat_screening"),
+            models.UniqueConstraint(
+                fields=["screening", "seat"],
+                name="unique_hold_per_screening_seat",
+            )
         ]
 
-    def is_active(self) -> bool:
-        return self.expires_at > timezone.now()
+    def __str__(self) -> str:
+        return f"Hold: {self.screening} - {self.seat} by {self.held_by}"
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at <= timezone.now()
