@@ -1,3 +1,5 @@
+import { getAccessToken } from "@/lib/auth";
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -28,12 +30,14 @@ if (!API_URL) {
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const url = `${API_URL}${path}`;
+  const accessToken = getAccessToken();
 
   const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
       ...(opts.clientId ? { "X-Client-Id": opts.clientId } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(opts.headers ?? {}),
     },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
