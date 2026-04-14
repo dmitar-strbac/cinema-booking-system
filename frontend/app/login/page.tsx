@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { setTokens } from "@/lib/auth";
 
@@ -13,11 +13,14 @@ type LoginResponse = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const nextUrl = searchParams.get("next") || "/movies";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -33,8 +36,8 @@ export default function LoginPage() {
         },
       });
 
-      setTokens(res.access, res.refresh);
-      router.push("/movies");
+      setTokens(res.access, res.refresh, username);
+      router.push(nextUrl);
       router.refresh();
     } catch (e: any) {
       setError(e?.message ?? "Login failed.");
@@ -89,6 +92,13 @@ export default function LoginPage() {
               {busy ? "Signing in..." : "Log in"}
             </button>
           </form>
+
+          <p className="mt-6 text-sm text-white/60">
+            Don’t have an account?{" "}
+            <Link href="/register" className="text-yellow-300">
+              Register
+            </Link>
+          </p>
 
         </div>
       </div>

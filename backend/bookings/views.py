@@ -10,7 +10,9 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from .models import (
     Hall,
@@ -30,6 +32,7 @@ from .serializers import (
     ReservedSeatSerializer,
     ScreeningSerializer,
     SeatSerializer,
+    RegisterSerializer,
 )
 from .utils import broadcast_screening_update
 
@@ -217,6 +220,8 @@ class ReservationViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in {"list", "destroy", "update", "partial_update"}:
             return [IsAdminUser()]
+        if self.action == "create":
+            return [IsAuthenticated()]
         return [AllowAny()]
 
     @action(detail=True, methods=["post"], url_path="start-payment", permission_classes=[AllowAny])
@@ -398,3 +403,22 @@ class ReservedSeatViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ReservedSeat.objects.select_related("reservation", "screening", "seat")
     serializer_class = ReservedSeatSerializer
     permission_classes = [IsAdminUser]
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.save()
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response(
+            {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
+        )
