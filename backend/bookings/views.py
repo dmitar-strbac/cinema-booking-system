@@ -397,6 +397,19 @@ class ReservationViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+    
+    @action(detail=False, methods=["get"], url_path="my", permission_classes=[IsAuthenticated])
+    def my_reservations(self, request):
+        reservations = (
+            Reservation.objects
+            .filter(user=request.user)
+            .select_related("screening", "screening__movie", "screening__hall")
+            .prefetch_related("reserved_seats", "reserved_seats__seat")
+            .order_by("-created_at")
+        )
+
+        serializer = self.get_serializer(reservations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ReservedSeatViewSet(viewsets.ReadOnlyModelViewSet):
@@ -420,5 +433,28 @@ class RegisterView(APIView):
             {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
+                "user": {
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "email": user.email,
+                },
             }
+        )
+    
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        return Response(
+            {
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+            status=status.HTTP_200_OK,
         )

@@ -11,6 +11,13 @@ type LoginResponse = {
   refresh: string;
 };
 
+type MeResponse = {
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,6 +28,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const nextUrl = searchParams.get("next") || "/";
+
+  const registered = searchParams.get("registered") === "1";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +46,9 @@ export default function LoginPage() {
       });
 
       setTokens(res.access, res.refresh, username);
+
+      const me = await api<MeResponse>("/auth/me/");
+      setTokens(res.access, res.refresh, me.first_name || me.username);
       router.push(nextUrl);
       router.refresh();
     } catch (e: any) {
@@ -50,6 +62,11 @@ export default function LoginPage() {
     <main className="page-shell py-14">
       <div className="mx-auto max-w-md">
         <div className="glass-card fade-in rounded-[32px] p-8 md:p-10">
+          {registered ? (
+            <div className="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-200">
+              Account created successfully. You can now log in.
+            </div>
+          ) : null}
           <p className="text-sm uppercase tracking-[0.3em] text-yellow-300/80">
             Account
           </p>

@@ -45,6 +45,7 @@ export type SeatMapResponse = {
 export type Reservation = {
   id: number;
   screening: number;
+  screening_detail?: Screening;
   customer_name: string;
   customer_email: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED";
@@ -52,6 +53,7 @@ export type Reservation = {
   payment_reference?: string;
   payment_amount?: string;
   payment_completed_at?: string | null;
+  ticket_code?: string | null;
   created_at: string;
   updated_at?: string;
   reserved_seats?: Array<{
@@ -59,6 +61,8 @@ export type Reservation = {
     reservation: number;
     screening: number;
     seat: number;
+    row?: number;
+    number?: number;
   }>;
 };
 
