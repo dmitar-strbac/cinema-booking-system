@@ -315,6 +315,14 @@ class ReservationFlowTests(APITestCase):
         resp = self.client.post(self.reservation_url, payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_authenticated_reservation_is_linked_to_user(self):
+        resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        reservation = Reservation.objects.get(id=resp.data["id"])
+        self.assertEqual(reservation.user, self.user)
+
 
 class PermissionTests(APITestCase):
     def setUp(self):

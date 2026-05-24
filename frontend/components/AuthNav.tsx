@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { clearTokens, getStoredUsername, isLoggedIn } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function AuthNav() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
@@ -53,7 +54,7 @@ export default function AuthNav() {
 
   return (
     <Link
-      href="/login"
+      href={`/login?next=${encodeURIComponent(pathname)}`}
       className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-white/80 hover:border-yellow-400/30 hover:text-white"
     >
       Login

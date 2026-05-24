@@ -20,7 +20,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextUrl = searchParams.get("next") || "/movies";
+  const nextUrl = searchParams.get("next") || "/";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
