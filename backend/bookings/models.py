@@ -2,6 +2,10 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 class TimeStampedModel(models.Model):
@@ -136,6 +140,13 @@ class Reservation(TimeStampedModel):
     class PaymentProvider(models.TextChoices):
         FAKE = "FAKE", "Fake"
 
+    user = models.ForeignKey(
+        User,
+        related_name="reservations",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     screening = models.ForeignKey(
         Screening,
         related_name="reservations",

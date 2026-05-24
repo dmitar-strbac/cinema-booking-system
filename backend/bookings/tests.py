@@ -64,6 +64,15 @@ class ReservationFlowTests(APITestCase):
 
         self.reservation_url = "/api/reservations/"
 
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            password="pass12345",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
     def create_pending_reservation(self, seat_ids=None, client_id="client-a"):
         payload = {
             "screening": self.screening.id,
@@ -291,6 +300,28 @@ class ReservationFlowTests(APITestCase):
 
         qr_resp = self.client.get(f"/api/reservations/{reservation_id}/qr/")
         self.assertEqual(qr_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_guest_cannot_create_reservation(self):
+        self.client.force_authenticate(user=None)
+
+        payload = {
+            "screening": self.screening.id,
+            "customer_name": "Guest User",
+            "customer_email": "guest@example.com",
+            "seat_ids": [self.seats[0].id],
+            "client_id": "guest-client",
+        }
+
+        resp = self.client.post(self.reservation_url, payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_reservation_is_linked_to_user(self):
+        resp = self.create_pending_reservation(seat_ids=[self.seats[0].id])
+
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        reservation = Reservation.objects.get(id=resp.data["id"])
+        self.assertEqual(reservation.user, self.user)
 
 
 class PermissionTests(APITestCase):

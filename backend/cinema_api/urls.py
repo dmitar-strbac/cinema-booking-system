@@ -24,6 +24,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from bookings.views import RegisterView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -42,6 +43,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/", include("bookings.urls")),
     path("auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path(

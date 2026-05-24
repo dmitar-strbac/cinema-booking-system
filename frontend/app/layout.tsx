@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import AuthNav from "@/components/AuthNav";
+import Image from "next/image";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,8 +32,15 @@ export default function RootLayout({
           <header className="sticky top-0 z-30 border-b border-white/8 bg-black/30 backdrop-blur-xl">
             <div className="page-shell flex h-16 items-center justify-between">
               <Link href="/" className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-yellow-400/20 bg-white/5 text-lg shadow-lg shadow-yellow-500/10">
-                  🎬
+                <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-yellow-400/20 bg-white/5 shadow-lg shadow-yellow-500/10">
+                  <Image
+                    src="/logo/cinema-logo.png"
+                    alt="Cinema Booking Logo"
+                    width={44}
+                    height={44}
+                    className="object-contain"
+                    priority
+                  />
                 </div>
                 <div>
                   <p className="text-sm font-medium tracking-[0.25em] text-white/60 uppercase">
@@ -54,6 +63,8 @@ export default function RootLayout({
                 >
                   Browse movies
                 </Link>
+
+                <AuthNav />
               </nav>
             </div>
           </header>

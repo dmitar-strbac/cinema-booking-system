@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
     Hall,
@@ -79,6 +80,7 @@ class ReservationSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "screening",
+            "user",
             "customer_name",
             "customer_email",
             "status",
@@ -177,8 +179,11 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
 
             amount = screening.base_price * Decimal(len(seats))
 
+            request = self.context.get("request")
+
             reservation = Reservation.objects.create(
                 **validated_data,
+                user=request.user if request and request.user.is_authenticated else None,
                 status=Reservation.Status.PENDING,
                 payment_provider=Reservation.PaymentProvider.FAKE,
                 payment_amount=amount,
@@ -208,3 +213,19 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
                 ).delete()
 
         return reservation
+    
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "password"]
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+        )
+        return user

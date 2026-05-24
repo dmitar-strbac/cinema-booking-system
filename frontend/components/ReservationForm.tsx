@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
 
 type Props = {
   disabled?: boolean;
@@ -14,14 +16,19 @@ export default function ReservationForm({ disabled, selectedCount, onSubmit }: P
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const loggedIn = isLoggedIn();
+
   const canSubmit = useMemo(() => {
+    if (!loggedIn) return selectedCount > 0;
     if (disabled) return false;
     if (submitting) return false;
     if (selectedCount <= 0) return false;
     if (!name.trim()) return false;
     if (!email.trim()) return false;
     return true;
-  }, [disabled, submitting, selectedCount, name, email]);
+  }, [loggedIn,disabled, submitting, selectedCount, name, email]);
 
   return (
     <div className="glass-card fade-in-delay rounded-[28px] p-6">
@@ -57,6 +64,11 @@ export default function ReservationForm({ disabled, selectedCount, onSubmit }: P
           className="cursor-pointer rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-5 py-3 text-sm font-semibold text-black disabled:opacity-50"
           disabled={!canSubmit}
           onClick={async () => {
+            if (!loggedIn) {
+              router.push(`/login?next=${encodeURIComponent(pathname)}`);
+              return;
+            }
+
             setErr(null);
             setSubmitting(true);
             try {
