@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.db.models import Sum
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -455,6 +456,78 @@ class MeView(APIView):
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "is_admin": user.is_staff,
             },
             status=status.HTTP_200_OK,
         )
+    
+
+class AdminOverviewView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        total_movies = Movie.objects.count()
+        total_screenings = Screening.objects.count()
+        total_reservations = Reservation.objects.count()
+
+        confirmed_reservations = Reservation.objects.filter(
+            status=Reservation.Status.CONFIRMED
+        ).count()
+
+        pending_reservations = Reservation.objects.filter(
+            status=Reservation.Status.PENDING
+        ).count()
+
+        revenue = (
+            Reservation.objects.filter(
+                status=Reservation.Status.CONFIRMED
+            ).aggregate(total=Sum("payment_amount"))["total"]
+            or 0
+        )
+
+        latest_reservations = (
+            Reservation.objects
+            .select_related("screening", "screening__movie")
+            .order_by("-created_at")[:5]
+        )
+
+        upcoming_screenings = (
+            Screening.objects
+            .select_related("movie", "hall")
+            .filter(start_time__gte=timezone.now())
+            .order_by("start_time")[:5]
+        )
+
+        return Response(
+            {
+                "stats": {
+                    "movies": total_movies,
+                    "screenings": total_screenings,
+                    "reservations": total_reservations,
+                    "confirmed": confirmed_reservations,
+                    "pending": pending_reservations,
+                    "revenue": str(revenue),
+                },
+                "latest_reservations": [
+                    {
+                        "id": r.id,
+                        "customer_name": r.customer_name,
+                        "movie": r.screening.movie.title,
+                        "status": r.status,
+                        "amount": str(r.payment_amount),
+                        "created_at": r.created_at,
+                    }
+                    for r in latest_reservations
+                ],
+                "upcoming_screenings": [
+                    {
+                        "id": s.id,
+                        "movie": s.movie.title,
+                        "hall": s.hall.name,
+                        "start_time": s.start_time,
+                    }
+                    for s in upcoming_screenings
+                ],
+            }
+        )
+    

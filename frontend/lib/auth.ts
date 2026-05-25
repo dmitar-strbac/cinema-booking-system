@@ -1,6 +1,7 @@
 export const ACCESS_TOKEN_KEY = "access_token";
 export const REFRESH_TOKEN_KEY = "refresh_token";
 export const USERNAME_KEY = "auth_username";
+export const IS_ADMIN_KEY = "is_admin";
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -37,4 +38,15 @@ export function clearTokens() {
 
 export function isLoggedIn(): boolean {
   return !!getAccessToken();
+}
+
+export function isAdmin(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(IS_ADMIN_KEY) === "true";
+}
+
+export function setAdmin(value: boolean) {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem(IS_ADMIN_KEY, value ? "true" : "false");
 }

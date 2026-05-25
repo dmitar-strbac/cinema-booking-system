@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { setTokens } from "@/lib/auth";
+import { setTokens, setAdmin } from "@/lib/auth";
 
 type LoginResponse = {
   access: string;
@@ -16,6 +16,7 @@ type MeResponse = {
   email: string;
   first_name: string;
   last_name: string;
+  is_admin: boolean;
 };
 
 export default function LoginPage() {
@@ -48,6 +49,7 @@ export default function LoginPage() {
       setTokens(res.access, res.refresh, username);
 
       const me = await api<MeResponse>("/auth/me/");
+      setAdmin(me.is_admin);
       setTokens(res.access, res.refresh, me.first_name || me.username);
       router.push(nextUrl);
       router.refresh();
