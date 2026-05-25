@@ -52,16 +52,17 @@ export default function RootLayout({
 
               <nav className="flex items-center gap-3 text-sm">
                 <Link
-                  href="/"
-                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-white/80 hover:border-yellow-400/30 hover:text-white"
-                >
-                  Home
-                </Link>
-                <Link
                   href="/movies"
                   className="rounded-full bg-gradient-to-r from-yellow-400 to-amber-300 px-4 py-2 font-medium text-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30"
                 >
-                  Browse movies
+                  Movies
+                </Link>
+
+                <Link
+                  href="/cinema-experience"
+                  className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-white/80 hover:border-yellow-400/30 hover:text-white lg:inline-flex"
+                >
+                  Experience
                 </Link>
 
                 <AuthNav />

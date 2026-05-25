@@ -7,6 +7,8 @@ from .views import (
     ScreeningViewSet,
     ReservationViewSet,
     ReservedSeatViewSet,
+    RegisterView,
+    MeView
 )
 
 
@@ -20,4 +22,6 @@ router.register(r"reserved-seats", ReservedSeatViewSet, basename="reservedseat")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("auth/me/", MeView.as_view(), name="me"),
+    path("auth/register/", RegisterView.as_view(), name="register"),
 ]
