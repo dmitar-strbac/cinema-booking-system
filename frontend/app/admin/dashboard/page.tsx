@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminOverview } from "@/lib/types";
+import AdminShell from "@/components/AdminShell";
 
 function formatDate(v: string) {
   return new Date(v).toLocaleString();
@@ -40,7 +41,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="page-shell py-10 md:py-14">
+    <AdminShell>
       <section>
         <p className="text-sm uppercase tracking-[0.35em] text-yellow-300/80">
           Admin
@@ -143,6 +144,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </section>
-    </main>
+    </AdminShell>
   );
 }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getClientId } from "@/lib/clientId";
 import { connectScreeningWS } from "@/lib/ws";
-import type { SeatMapResponse, SeatMapSeat, Reservation } from "@/lib/types";
+import type { SeatMapResponse, SeatMapSeat, Reservation, Screening } from "@/lib/types";
 import SeatMap from "@/components/SeatMap";
 import ReservationForm from "@/components/ReservationForm";
 
@@ -28,11 +28,18 @@ export default function SeatsPage({ params }: Props) {
   const selectedRef = useRef<Set<number>>(new Set());
   selectedRef.current = selected;
 
+  const [screeningTitle, setScreeningTitle] = useState("");
+
   async function fetchSeatMap() {
-    const data = await api<SeatMapResponse>(`/screenings/${screeningId}/seat-map/`, {
-      clientId,
-    });
-    setSeats(data.seats);
+    const [seatMap, screening] = await Promise.all([
+      api<SeatMapResponse>(`/screenings/${screeningId}/seat-map/`, {
+        clientId,
+      }),
+      api<Screening>(`/screenings/${screeningId}/`),
+    ]);
+
+    setSeats(seatMap.seats);
+    setScreeningTitle(screening.movie.title);
   }
 
   useEffect(() => {
@@ -194,7 +201,7 @@ export default function SeatsPage({ params }: Props) {
         <h1 className="mt-3 text-4xl font-semibold text-white md:text-5xl">
           Choose your seats
         </h1>
-        <p className="mt-3 text-base text-white/60">Screening #{screeningId}</p>
+        <p className="mt-3 text-base text-white/60">{screeningTitle || "Loading screening..."}</p>
       </section>
 
       {loading ? (
