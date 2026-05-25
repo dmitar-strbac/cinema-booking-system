@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { clearTokens, getStoredUsername, isLoggedIn } from "@/lib/auth";
+import { clearTokens, getStoredUsername, isAdmin, isLoggedIn } from "@/lib/auth";
 import { usePathname, useRouter } from "next/navigation";
 
 export default function AuthNav() {
@@ -13,11 +13,13 @@ export default function AuthNav() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [admin, setAdminState] = useState(false);
 
   useEffect(() => {
     function syncAuthState() {
       setLoggedIn(isLoggedIn());
       setUsername(getStoredUsername());
+      setAdminState(isAdmin());
     }
 
     syncAuthState();
@@ -80,6 +82,16 @@ export default function AuthNav() {
           >
             My Tickets
           </Link>
+
+          {admin ? (
+            <Link
+              href="/admin/dashboard"
+              onClick={() => setOpen(false)}
+              className="block rounded-xl px-4 py-3 text-sm text-yellow-200 hover:bg-yellow-400/10"
+            >
+              Admin Dashboard
+            </Link>
+          ) : null}
 
           <button
             type="button"

@@ -80,3 +80,30 @@ export type ReservationQrResponse = {
   ticket_code: string;
   qr_image_base64: string;
 };
+
+export type AdminOverview = {
+  stats: {
+    movies: number;
+    screenings: number;
+    reservations: number;
+    confirmed: number;
+    pending: number;
+    revenue: string;
+  };
+
+  latest_reservations: Array<{
+    id: number;
+    customer_name: string;
+    movie: string;
+    status: string;
+    amount: string;
+    created_at: string;
+  }>;
+
+  upcoming_screenings: Array<{
+    id: number;
+    movie: string;
+    hall: string;
+    start_time: string;
+  }>;
+};

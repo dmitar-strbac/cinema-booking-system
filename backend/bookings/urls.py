@@ -8,7 +8,8 @@ from .views import (
     ReservationViewSet,
     ReservedSeatViewSet,
     RegisterView,
-    MeView
+    MeView,
+    AdminOverviewView,
 )
 
 
@@ -24,4 +25,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("auth/me/", MeView.as_view(), name="me"),
     path("auth/register/", RegisterView.as_view(), name="register"),
+    path("admin/overview/", AdminOverviewView.as_view(), name="admin-overview"),
 ]
