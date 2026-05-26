@@ -139,6 +139,7 @@ class Reservation(TimeStampedModel):
 
     class PaymentProvider(models.TextChoices):
         FAKE = "FAKE", "Fake"
+        STRIPE = "STRIPE", "Stripe"
 
     user = models.ForeignKey(
         User,

@@ -3,11 +3,14 @@ import base64
 import io
 
 import qrcode
+import stripe
 from django.http import JsonResponse
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.db.models import Sum
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -36,6 +39,9 @@ from .serializers import (
     RegisterSerializer,
 )
 from .utils import broadcast_screening_update
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 class MovieViewSet(viewsets.ModelViewSet):
@@ -411,6 +417,53 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(reservations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="create-checkout-session",
+        permission_classes=[AllowAny],
+    )
+    def create_checkout_session(self, request, pk=None):
+        reservation = self.get_object()
+
+        if reservation.status != Reservation.Status.PENDING:
+            return Response(
+                {"detail": "Only pending reservations can be paid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "rsd",
+                        "product_data": {
+                            "name": f"{reservation.screening.movie.title} Tickets",
+                        },
+                        "unit_amount": int(reservation.payment_amount * 100),
+                    },
+                    "quantity": 1,
+                }
+            ],
+            metadata={
+                "reservation_id": reservation.id,
+            },
+            success_url=f"{settings.FRONTEND_URL}/payments/success?reservationId={reservation.id}",
+            cancel_url=f"{settings.FRONTEND_URL}/payments/cancel?reservationId={reservation.id}",
+        )
+
+        reservation.payment_provider = Reservation.PaymentProvider.STRIPE
+        reservation.payment_reference = checkout_session.id
+        reservation.save(update_fields=["payment_provider", "payment_reference"])
+
+        return Response(
+            {
+                "checkout_url": checkout_session.url,
+            }
+        )
 
 
 class ReservedSeatViewSet(viewsets.ReadOnlyModelViewSet):
@@ -530,4 +583,101 @@ class AdminOverviewView(APIView):
                 ],
             }
         )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class StripeWebhookView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        payload = request.body
+        signature = request.META.get("HTTP_STRIPE_SIGNATURE")
+        endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
+
+        try:
+            event = stripe.Webhook.construct_event(
+                payload,
+                signature,
+                endpoint_secret,
+            )
+        except ValueError:
+            return Response(
+                {"detail": "Invalid payload."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except stripe.error.SignatureVerificationError:
+            return Response(
+                {"detail": "Invalid signature."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if event["type"] == "checkout.session.completed":
+            session = event["data"]["object"]
+            
+            reservation_id = None
+            if session.metadata:
+                reservation_id = getattr(session.metadata, "reservation_id", None)
+
+            if not reservation_id:
+                return Response({"received": True}, status=status.HTTP_200_OK)
+
+            try:
+                with transaction.atomic():
+                    reservation = (
+                        Reservation.objects.select_for_update()
+                        .select_related("screening")
+                        .prefetch_related("reserved_seats")
+                        .get(id=int(reservation_id))
+                    )
+
+                    if reservation.status == Reservation.Status.PENDING:
+                        if not reservation.ticket_code:
+                            reservation.ticket_code = (
+                                f"TICKET-{reservation.id}-{uuid.uuid4().hex[:8].upper()}"
+                            )
+
+                        reservation.status = Reservation.Status.CONFIRMED
+                        reservation.payment_completed_at = timezone.now()
+                        reservation.payment_reference = session.id or reservation.payment_reference
+                        reservation.payment_provider = Reservation.PaymentProvider.STRIPE
+                        reservation.save(
+                            update_fields=[
+                                "status",
+                                "payment_completed_at",
+                                "payment_reference",
+                                "payment_provider",
+                                "ticket_code",
+                                "updated_at",
+                            ]
+                        )
+
+                        SeatHold.objects.filter(
+                            screening=reservation.screening,
+                            seat_id__in=reservation.reserved_seats.values_list(
+                                "seat_id",
+                                flat=True,
+                            ),
+                        ).delete()
+
+                        broadcast_screening_update(
+                            reservation.screening_id,
+                            {
+                                "event": "hold_updated",
+                                "screening_id": reservation.screening_id,
+                            },
+                        )
+
+            except Reservation.DoesNotExist:
+                return Response(
+                    {"detail": "Reservation not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            except Exception as e:
+                return Response(
+                    {"detail": str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        return Response({"received": True}, status=status.HTTP_200_OK)
     

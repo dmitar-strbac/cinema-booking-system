@@ -18,8 +18,10 @@ export default function PaymentSuccessPage() {
     if (!reservationId) return;
 
     let mounted = true;
+    let attempts = 0;
+    const maxAttempts = 8;
 
-    (async () => {
+    async function loadQrWithRetry() {
       try {
         setLoading(true);
         setError(null);
@@ -28,13 +30,25 @@ export default function PaymentSuccessPage() {
 
         if (!mounted) return;
         setQr(data);
+        setLoading(false);
       } catch (e: any) {
+        attempts += 1;
+
         if (!mounted) return;
-        setError(e?.message ?? "Failed to load QR ticket.");
-      } finally {
-        if (mounted) setLoading(false);
+
+        if (attempts < maxAttempts) {
+          setTimeout(loadQrWithRetry, 1500);
+          return;
+        }
+
+        setError(
+          "Payment was completed, but your QR ticket is still being prepared. Please refresh this page in a moment."
+        );
+        setLoading(false);
       }
-    })();
+    }
+
+    loadQrWithRetry();
 
     return () => {
       mounted = false;
@@ -57,7 +71,7 @@ export default function PaymentSuccessPage() {
 
         {reservationId ? (
           <p className="mt-6 text-sm text-white/80">
-            Reservation ID: <span className="font-semibold text-yellow-200">#{reservationId}</span>
+            Your ticket is being prepared. You can also find it later in My Tickets.
           </p>
         ) : null}
 
@@ -66,7 +80,7 @@ export default function PaymentSuccessPage() {
             <h2 className="text-lg font-semibold text-white">QR Ticket</h2>
 
             {loading ? (
-              <p className="mt-4 text-sm text-white/60">Loading QR code...</p>
+              <p className="mt-4 text-sm text-white/60">Preparing your QR ticket...</p>
             ) : error ? (
               <p className="mt-4 text-sm text-rose-300">{error}</p>
             ) : qr ? (

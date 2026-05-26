@@ -10,6 +10,7 @@ from .views import (
     RegisterView,
     MeView,
     AdminOverviewView,
+    StripeWebhookView,
 )
 
 
@@ -26,4 +27,5 @@ urlpatterns = [
     path("auth/me/", MeView.as_view(), name="me"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("admin/overview/", AdminOverviewView.as_view(), name="admin-overview"),
+    path("payments/stripe/webhook/", StripeWebhookView.as_view(), name="stripe-webhook"),
 ]

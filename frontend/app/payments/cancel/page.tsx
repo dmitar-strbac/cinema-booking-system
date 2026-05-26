@@ -24,7 +24,7 @@ export default function PaymentCancelPage() {
 
         {reservationId ? (
           <p className="mt-6 text-sm text-white/80">
-            Reservation ID: <span className="font-semibold text-yellow-200">#{reservationId}</span>
+            Your booking was not completed. You can start a new reservation anytime.
           </p>
         ) : null}
 
